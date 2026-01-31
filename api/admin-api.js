@@ -1,16 +1,15 @@
 import { Client } from 'pg';
 
-export default async function handler(request, response) {
+export default async function handler(req, res) {
     const client = new Client({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
     });
-
+    
     await client.connect();
 
     try {
-        // A) GET - NAČÍST UŽIVATELE
-        if (request.method === 'GET') {
+        if (req.method === 'GET') {
             const usersRes = await client.query(`
                 SELECT u.id, u.username, u.discord_id, string_agg(r.role_name, ',') as roles
                 FROM pcr_users u
@@ -23,20 +22,16 @@ export default async function handler(request, response) {
             const rolesRes = await client.query("SELECT id, role_name FROM pcr_roles ORDER BY category, role_name");
 
             await client.end();
-            return response.status(200).json({
+            return res.status(200).json({
                 users: usersRes.rows,
                 allRoles: rolesRes.rows
             });
         }
 
-        // B) POST - ULOŽIT ROLE
-        if (request.method === 'POST') {
-            const { userId, roleIds } = request.body;
-
-            // Smazat staré role
+        if (req.method === 'POST') {
+            const { userId, roleIds } = req.body;
             await client.query("DELETE FROM pcr_user_roles WHERE user_id = $1", [userId]);
 
-            // Vložit nové
             if (roleIds && roleIds.length > 0) {
                 for (const rId of roleIds) {
                     await client.query("INSERT INTO pcr_user_roles (user_id, role_id) VALUES ($1, $2)", [userId, rId]);
@@ -44,14 +39,13 @@ export default async function handler(request, response) {
             }
 
             await client.end();
-            return response.status(200).json({ message: 'Saved' });
+            return res.status(200).json({ message: 'Saved' });
         }
-
-        return response.status(405).send('Method Not Allowed');
+        
+        return res.status(405).json({ error: 'Method not allowed' });
 
     } catch (err) {
-        console.error(err);
         await client.end();
-        return response.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 }
