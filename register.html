@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>PČR | Registrace</title>
+    <style>
+        /* Styl pro pending screen (stejný jako v login) */
+        .pending-box {
+            display: none; 
+            text-align: left; 
+            border-top: 2px solid red; 
+            margin-top: 0px; 
+            padding-top: 20px;
+        }
+        .pending-title { color: red; text-align: center; font-size: 24px; margin: 0; }
+        .pending-subtitle { color: orange; text-align: center; margin-top: 5px; text-transform: uppercase; font-size: 14px; }
+        .pending-text { font-size: 13px; line-height: 1.6; color: #ccc; text-align: justify; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2 id="regHeader">Nábor nového příslušníka</h2>
+        
+        <form id="regForm">
+            <label>Služební jméno</label>
+            <input type="text" id="user" placeholder="např. Novák" required>
+            
+            <label>Discord ID (pro notifikace)</label>
+            <input type="text" id="discordId" placeholder="Tvoje ID (např. 3289...)" required>
+            
+            <label>Heslo</label>
+            <input type="password" id="pass" placeholder="Zvolte si heslo" required>
+            
+            <button type="submit" id="regBtn">ODESLAT ŽÁDOST O PŘIJETÍ</button>
+        </form>
+
+        <a href="index.html" class="link" id="loginLink">Již máte účet? Zkontrolovat stav</a>
+
+        <div id="pendingScreen" class="pending-box">
+            <h3 class="pending-title">⛔ PŘÍSTUP ODEPŘEN ⛔</h3>
+            <h4 class="pending-subtitle">ČEKÁM NA SCHVÁLENÍ PŘÍSTUPU...</h4>
+            
+            <hr style="border-color: #444;">
+
+            <p class="pending-text">
+                <strong>VĚC: Oznámení o bezpečnostním procesu autorizace.</strong>
+                <br><br>
+                Vážený žadateli, systém detekoval, že Vaše identita s přiděleným OEČ dosud neprošla finální autorizací ze strany velení útvaru. V souladu s <strong>§ 14 zákona č. 361/2003 Sb.</strong>, o služebním poměru příslušníků bezpečnostních sborů, probíhá bezpečnostní prověrka Vaší osoby.
+                <br><br>
+                Dle interních předpisů Policejního prezidia a <strong>zákona č. 273/2008 Sb.</strong>, o Policii České republiky, je tato lhůta stanovena na:
+                <br>
+                <span style="color: white; font-weight: bold; font-size: 16px; display: block; text-align: center; margin: 10px 0;">2 až 10 pracovních dní</span>
+                
+                Prosíme o strpení. Jakákoliv urgence nebo opakované pokusy o prolomení tohoto rozhraní mohou být klasifikovány jako pokus o neoprávněný přístup k počítačovému systému dle <strong>§ 230 Trestního zákoníku</strong> a povedou k okamžitému zamítnutí žádosti.
+                <br><br>
+                <em>Vyčkejte na změnu stavu (notifikace dorazí na Discord).</em>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('regForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('regBtn');
+            btn.innerText = "ODESÍLÁM...";
+            btn.disabled = true;
+
+            const data = { 
+                user: document.getElementById('user').value, 
+                discordId: document.getElementById('discordId').value,
+                pass: document.getElementById('pass').value
+            };
+
+            try {
+                const res = await fetch('/.netlify/functions/register', { method: 'POST', body: JSON.stringify(data) });
+                const result = await res.json();
+                
+                if (res.ok) {
+                    // === ÚSPĚCH -> ZOBRAZIT PENDING SCREEN ===
+                    document.getElementById('regForm').style.display = 'none';
+                    document.getElementById('regHeader').style.display = 'none';
+                    document.getElementById('loginLink').style.display = 'none';
+                    document.getElementById('pendingScreen').style.display = 'block';
+                } else {
+                    alert(result.error || "Chyba registrace");
+                    btn.innerText = "ODESLAT ŽÁDOST O PŘIJETÍ"; 
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Chyba komunikace se serverem.");
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

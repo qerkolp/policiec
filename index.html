@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>PČR | Vstup do systému</title>
+</head>
+<body>
+    <div class="auth-container">
+        <div id="loginHeader">
+            <h2>Informační systém PČR</h2>
+        </div>
+
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Služební jméno" required>
+            <input type="password" id="password" placeholder="Heslo" required>
+            <button type="submit" id="loginBtn">PŘIHLÁSIT SE</button>
+        </form>
+
+        <p id="errorMsg" style="color: #ff4444; text-align: center; display: none; margin-top: 10px;"></p>
+        
+        <div id="pendingScreen" style="display:none; text-align:left; border-top: 1px solid #444; margin-top: 20px; padding-top: 10px;">
+            <h3 style="color: orange; text-align: center; text-transform: uppercase;">⚠️ PŘÍSTUP ODEPŘEN - ČEKÁ NA SCHVÁLENÍ</h3>
+            
+            <p style="font-size: 13px; color: #ccc;"><strong>VĚC: Oznámení o dočasném pozastavení přístupových práv</strong></p>
+            
+            <p style="font-size: 12px; line-height: 1.5; color: #8b949e;">
+                Vážený žadateli,
+                <br><br>
+                Vaše registrace do centrální evidence Policie České republiky byla přijata a zaevidována systémem pod vygenerovaným OEČ. V současné chvíli však <strong>nedisponujete bezpečnostní prověrkou</strong> nutnou pro nahlížení do utajovaných skutečností ve smyslu zákona č. 412/2005 Sb., o ochraně utajovaných informací a o bezpečnostní způsobilosti.
+                <br><br>
+                Dle § 14 služebního zákona (z. č. 361/2003 Sb.) nyní probíhá administrativní proces ověřování vaší bezúhonnosti a služebního zařazení ze strany velení útvaru (Generální štáb).
+                <br><br>
+                Tato lhůta je stanovena na <strong>2 až 10 pracovních dní</strong>.
+                <br><br>
+                <strong>UPOZORNĚNÍ:</strong> Jakýkoliv pokus o obcházení tohoto zabezpečení, opakované pokusy o přihlášení nebo urgence u nadřízených mohou být klasifikovány jako narušení kybernetické bezpečnosti státu. Vyčkejte na oficiální vyrozumění.
+            </p>
+        </div>
+
+        <a href="register.html" class="link" id="regLink">Registrace nového příslušníka</a>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errorMsg = document.getElementById('errorMsg');
+            const pendingScreen = document.getElementById('pendingScreen');
+            const loginForm = document.getElementById('loginForm'); // Odkaz na formulář
+            const regLink = document.getElementById('regLink');
+
+            btn.disabled = true;
+            btn.innerText = 'OVĚŘUJI...';
+            errorMsg.style.display = 'none';
+            pendingScreen.style.display = 'none';
+
+            const data = {
+                user: document.getElementById('username').value,
+                pass: document.getElementById('password').value
+            };
+
+            try {
+                const res = await fetch('/.netlify/functions/login', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+
+                // 1. POKUD JE PENDING (403) -> UKAŽ SLOHOVKU A SKRYJ FORMULÁŘ
+                if (res.status === 403 && result.status === 'pending') {
+                    loginForm.style.display = 'none'; // Skryje formulář
+                    regLink.style.display = 'none';   // Skryje link na registraci
+                    document.getElementById('loginHeader').style.display = 'none';
+                    
+                    pendingScreen.style.display = 'block'; // Zobrazí slohovku
+                    return; // Konec, nepokračujeme
+                }
+
+                // 2. POKUD JE OK (200) -> PŘIHLÁSIT
+                if (res.ok) {
+                    localStorage.setItem('pcr_user', JSON.stringify(result));
+                    window.location.href = 'spis.html'; 
+                } else {
+                    throw new Error(result.error || 'Chyba přihlášení');
+                }
+
+            } catch (err) {
+                errorMsg.innerText = '❌ ' + err.message;
+                errorMsg.style.display = 'block';
+                btn.disabled = false;
+                btn.innerText = 'PŘIHLÁSIT SE';
+            }
+        };
+    </script>
+</body>
+</html>

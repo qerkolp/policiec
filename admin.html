@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>PČR | SPRÁVA SYSTÉMU</title>
+    <style>
+        /* Styl pro zastrašovací zprávu */
+        .alert-screen {
+            background-color: #3d0000;
+            color: #ffcccc;
+            padding: 40px;
+            border: 2px solid red;
+            box-shadow: 0 0 50px red;
+            display: none; /* Defaultně skryto */
+            text-align: justify;
+            font-family: 'Courier New', monospace;
+        }
+        .alert-screen h1 { color: red; text-transform: uppercase; text-align: center; font-size: 32px; border-bottom: 2px solid red; padding-bottom: 20px; }
+        .alert-screen strong { color: white; text-decoration: underline; }
+        
+        /* Styl pro Admin panel */
+        .admin-panel { display: none; } /* Defaultně skryto */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #0d1117; }
+        th, td { border: 1px solid #30363d; padding: 10px; text-align: left; }
+        th { background: #1f2937; color: #58a6ff; }
+        tr:hover { background: #161b22; }
+        .role-badge { background: #0055a4; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; }
+        .action-btn { background: #238636; padding: 5px 10px; font-size: 12px; width: auto; margin: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="accessDenied" class="alert-screen">
+        <h1>⛔ KRITICKÉ NARUŠENÍ BEZPEČNOSTI ⛔</h1>
+        <p><strong>UPOZORNĚNÍ:</strong> Systém detekoval neautorizovaný pokus o přístup do vyhrazené sekce "TOP SECRET / ŘÍZENÍ LIDSKÝCH ZDROJŮ". Vaše identita a IP adresa byly zaznamenány a odeslány Odboru vnitřní kontroly (OVK).</p>
+        <br>
+        <p>Tímto jednáním jste se mohl/a dopustit trestného činu dle <strong>§ 230 Trestního zákoníku (40/2009 Sb.)</strong> – <em>Neoprávněný přístup k počítačovému systému a nosiči informací</em>. Dle odstavce 2 hrozí pachateli odnětí svobody až na dvě léta, zákaz činnosti nebo propadnutí věci.</p>
+        <br>
+        <p>Dále upozorňujeme na porušení <strong>Zákona č. 181/2014 Sb., o kybernetické bezpečnosti</strong>, konkrétně § 7, který definuje narušení důvěrnosti, integrity a dostupnosti informací v kritické informační infrastruktuře státu.</p>
+        <br>
+        <p>Vaše jednání je nyní posuzováno jako <em>bezpečnostní incident typu A+</em>. Okamžitě opusťte tuto sekci, vypněte terminál a přejděte na naší aplikaci do příslušné místnosti, nebo se neprodleně nahlaste svému nadřízenému k podání vysvětlení.</p>
+        <br>
+        <div style="text-align: center; color: red; font-size: 20px; font-weight: bold; margin-top: 30px;">
+            LOGOVÁNÍ TERMINÁLU DOKONČENO...<br>
+            ODESÍLÁNÍ HLÁŠENÍ NA PREZIDIUM...
+        </div>
+        <button onclick="window.location.href='spis.html'" style="background: #550000; margin-top: 30px;">OKAMŽITÝ NÁVRAT NA HLAVNÍ STRÁNKU</button>
+    </div>
+
+    <div id="adminPanel" class="container admin-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>🛠️ Správa příslušníků a rolí</h2>
+            <button onclick="window.location.href='spis.html'" style="width:auto; background:#30363d;">Zpět na spisy</button>
+        </div>
+        <p>Zde můžete spravovat role a přístupy. Vyberte uživatele ze seznamu.</p>
+
+        <div id="loading">Načítám personální databázi...</div>
+        
+        <table id="usersTable" style="display:none;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Jméno</th>
+                    <th>Discord ID</th>
+                    <th>Současné Role</th>
+                    <th>Akce</th>
+                </tr>
+            </thead>
+            <tbody id="usersBody"></tbody>
+        </table>
+    </div>
+
+    <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100;">
+        <div style="background:#161c2d; width:500px; margin:100px auto; padding:20px; border-radius:8px; border: 1px solid #0055a4;">
+            <h3>Upravit role: <span id="modalUsername" style="color:#58a6ff;"></span></h3>
+            <p style="font-size:12px; color:#888;">Vyberte max. 5 rolí.</p>
+            <div id="modalRoles" style="max-height:300px; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:20px;"></div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="saveRoles()" style="background:#238636;">ULOŽIT ZMĚNY</button>
+                <button onclick="closeModal()" style="background:#3d1a1a;">ZRUŠIT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. OKAMŽITÁ KONTROLA HODNOSTI
+        const user = JSON.parse(localStorage.getItem('pcr_user'));
+        const allowedRanks = ['Generálporučík', 'Generálmajor', 'Brigádní generál'];
+        
+        // Zjistíme, jestli má user aspoň jednu z povolených hodností
+        const hasAccess = user && user.roles && user.roles.some(role => allowedRanks.includes(role));
+
+        if (!hasAccess) {
+            document.getElementById('accessDenied').style.display = 'block';
+        } else {
+            document.getElementById('adminPanel').style.display = 'block';
+            loadUsers();
+        }
+
+        // --- ADMIN LOGIKA ---
+
+        let allRoles = [];
+        let currentEditingId = null;
+
+        async function loadUsers() {
+            const res = await fetch('/.netlify/functions/admin-api?action=list');
+            const data = await res.json();
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('usersTable').style.display = 'table';
+            const tbody = document.getElementById('usersBody');
+            tbody.innerHTML = '';
+
+            // Načtení seznamu všech možných rolí (pro modal)
+            allRoles = data.allRoles;
+
+            data.users.forEach(u => {
+                const roleBadges = u.roles ? u.roles.map(r => `<span class="role-badge">${r}</span>`).join('') : '<span style="color:#666">-</span>';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td><strong>${u.username}</strong></td>
+                        <td>${u.discord_id || '-'}</td>
+                        <td>${roleBadges}</td>
+                        <td><button class="action-btn" onclick="openEdit(${u.id}, '${u.username}', '${u.roles || ''}')">UPRAVIT</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openEdit(id, name, currentRolesStr) {
+            currentEditingId = id;
+            document.getElementById('modalUsername').innerText = name;
+            document.getElementById('editModal').style.display = 'block';
+            
+            const currentRoles = currentRolesStr.split(',');
+            const container = document.getElementById('modalRoles');
+            container.innerHTML = '';
+
+            allRoles.forEach(r => {
+                const isChecked = currentRoles.includes(r.role_name) ? 'checked' : '';
+                container.innerHTML += `<label style="font-size:13px; display:flex; align-items:center;"><input type="checkbox" value="${r.id}" ${isChecked}> ${r.role_name}</label>`;
+            });
+        }
+
+        async function saveRoles() {
+            const checkboxes = document.querySelectorAll('#modalRoles input:checked');
+            if (checkboxes.length > 5) {
+                alert("⛔ Maximálně 5 rolí na osobu!");
+                return;
+            }
+            
+            const roleIds = Array.from(checkboxes).map(c => c.value);
+            
+            const btn = document.querySelector('#editModal button');
+            btn.innerText = "UKLÁDÁM...";
+
+            await fetch('/.netlify/functions/admin-api', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'update', userId: currentEditingId, roleIds: roleIds })
+            });
+
+            closeModal();
+            loadUsers(); // Refresh tabulky
+            btn.innerText = "ULOŽIT ZMĚNY";
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

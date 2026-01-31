@@ -1,0 +1,10 @@
+{
+  "name": "policie-cr-system",
+  "version": "1.0.0",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "bcryptjs": "^2.4.3",
+    "discord.js": "^14.14.1",
+    "node-fetch": "^2.7.0"
+  }
+}

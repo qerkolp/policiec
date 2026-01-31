@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>Dispečink LUNA</title>
+    <style>
+        body { background: transparent; padding: 0; margin: 0; overflow-y: auto; }
+        
+        /* Ovládací panel nahoře */
+        .status-panel {
+            background: #161c2d;
+            padding: 15px;
+            border-bottom: 2px solid #0055a4;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        select, input {
+            background: #0d1117; color: white; border: 1px solid #30363d;
+            padding: 8px; border-radius: 4px;
+        }
+
+        .btn-status {
+            padding: 8px 15px; border: none; border-radius: 4px;
+            color: white; font-weight: bold; cursor: pointer; text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        /* Mřížka hlídek */
+        .unit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+            padding: 0 10px;
+        }
+
+        .unit-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-left-width: 5px; /* Tlustá čára vlevo pro status */
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .unit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .callsign { font-size: 18px; font-weight: bold; color: white; }
+        .icon { font-size: 20px; }
+        .officer-name { font-size: 12px; color: #8b949e; }
+        .status-text { font-size: 11px; font-weight: bold; margin-top: 5px; display: block; }
+
+        /* Barvy stavů */
+        .st-available { border-left-color: #00ff88; } /* Zelená */
+        .st-busy { border-left-color: #ff4444; }      /* Červená */
+        .st-break { border-left-color: #ffaa00; }     /* Oranžová */
+        
+        .text-green { color: #00ff88; }
+        .text-red { color: #ff4444; }
+        .text-orange { color: #ffaa00; }
+
+    </style>
+</head>
+<body>
+
+    <div class="status-panel">
+        <div style="display:flex; gap:5px; align-items:center;">
+            <span style="font-weight:bold; color:#0055a4;">MOJE JEDNOTKA:</span>
+            <select id="callName">
+                <option value="Iris">Iris (OOP)</option>
+                <option value="Hvězda">Hvězda (Dopravka)</option>
+                <option value="Libela">Libela (PMJ)</option>
+                <option value="Anomálka">Anomálka (OHS)</option>
+                <option value="Hlaveň">Hlaveň (ZJ)</option>
+                <option value="Omega">Omega (SKPV)</option>
+                <option value="Kril">Kril (OVK)</option>
+                <option value="Luna">Luna (Operační)</option>
+            </select>
+            <input type="text" id="callNum" placeholder="Číslo (10)" style="width: 60px;">
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button class="btn-status" style="background: #1b4b36; border:1px solid #00ff88;" onclick="updateStatus('available')">🟢 Na příjmu</button>
+            <button class="btn-status" style="background: #4b1b1b; border:1px solid #ff4444;" onclick="updateStatus('busy')">🔴 Zákrok</button>
+            <button class="btn-status" style="background: #4b3b1b; border:1px solid #ffaa00;" onclick="updateStatus('break')">🟠 Pauza / Stanice</button>
+            <button class="btn-status" style="background: #21262d; border:1px solid #555;" onclick="updateStatus('offline')">⚫ Konec služby</button>
+        </div>
+        
+        <div style="margin-left:auto; font-size:12px; color:#666;" id="lastUpdate">Aktualizováno: -</div>
+    </div>
+
+    <div id="grid" class="unit-grid">
+        <div style="color:white;">Načítám data z LUNA systému...</div>
+    </div>
+
+    <script>
+        const user = JSON.parse(localStorage.getItem('pcr_user'));
+        
+        // Pokud není uživatel přihlášený v hlavním okně, iframe nic neudělá (nebo přesměruje)
+        if (!user) document.body.innerHTML = "<h3 style='color:red'>Chyba autentizace</h3>";
+
+        const icons = {
+            'Iris': '👮', 'Hvězda': '🚓', 'Libela': '🚔', 'Anomálka': '🐕', 
+            'Hlaveň': '🔫', 'Omega': '🕵️', 'Kril': '⚖️', 'Luna': '📡'
+        };
+
+        const statusNames = {
+            'available': 'NA PŘÍJMU',
+            'busy': 'ZÁKROK / VÝJEZD',
+            'break': 'NA STANICI / PAUZA'
+        };
+
+        async function updateStatus(status) {
+            const name = document.getElementById('callName').value;
+            const num = document.getElementById('callNum').value;
+
+            if (status !== 'offline' && !num && name !== 'Luna') {
+                alert("Vyplň číslo volačky!");
+                return;
+            }
+
+            // Odeslat na backend
+            await fetch('/.netlify/functions/status-api', {
+                method: 'POST',
+                body: JSON.stringify({ userId: user.id, status, callName: name, callNum: num })
+            });
+
+            loadUnits(); // Hned obnovit
+        }
+
+        async function loadUnits() {
+            try {
+                const res = await fetch('/.netlify/functions/status-api');
+                const units = await res.json();
+
+                const grid = document.getElementById('grid');
+                grid.innerHTML = '';
+
+                if (units.length === 0) {
+                    grid.innerHTML = '<div style="color:#888;">Žádné aktivní hlídky v terénu.</div>';
+                    return;
+                }
+
+                units.forEach(u => {
+                    const icon = icons[u.callsign_name] || '👮';
+                    const cssClass = 'st-' + u.current_status;
+                    const textClass = 'text-' + (u.current_status === 'available' ? 'green' : u.current_status === 'busy' ? 'red' : 'orange');
+
+                    grid.innerHTML += `
+                        <div class="unit-card ${cssClass}">
+                            <div class="unit-header">
+                                <span class="callsign">${u.callsign_name} ${u.callsign_number || ''}</span>
+                                <span class="icon">${icon}</span>
+                            </div>
+                            <div class="officer-name">${u.username}</div>
+                            <span class="status-text ${textClass}">${statusNames[u.current_status] || u.current_status}</span>
+                        </div>
+                    `;
+                });
+
+                // Čas poslední aktualizace
+                const now = new Date();
+                document.getElementById('lastUpdate').innerText = "Aktualizováno: " + now.toLocaleTimeString();
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Automatický refresh každých 5 vteřin
+        loadUnits();
+        setInterval(loadUnits, 5000);
+    </script>
+</body>
+</html>

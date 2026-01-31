@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>PČR | CENTRÁLNÍ SYSTÉM</title>
+    <style>
+        body { display: flex; height: 100vh; overflow: hidden; padding: 0; margin: 0; background: #0b0f19; }
+        
+        /* LEVÝ SIDEBAR (MENU) */
+        .sidebar { width: 260px; background: #161c2d; border-right: 1px solid #30363d; display: flex; flex-direction: column; padding: 20px 10px; overflow-y: auto; }
+        .sidebar h2 { color: #0055a4; text-align: center; font-size: 18px; margin-bottom: 20px; letter-spacing: 1px; }
+        .menu-btn { 
+            background: transparent; color: #8b949e; border: none; padding: 12px 15px; 
+            text-align: left; cursor: pointer; border-radius: 6px; margin-bottom: 5px; font-weight: 500; display: flex; align-items: center; 
+        }
+        .menu-btn:hover { background: #1f2937; color: white; }
+        .menu-btn.active { background: #0055a4; color: white; }
+        .menu-icon { margin-right: 10px; width: 20px; text-align: center; }
+
+        /* HLAVNÍ OBSAH VPRAVO */
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; position: relative; }
+        .section { display: none; } /* Všechny sekce skryté */
+        .section.active { display: block; animation: fadeIn 0.3s; }
+
+        /* MODULY STYLY */
+        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; padding-bottom: 15px; margin-bottom: 20px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .data-card { background: #0d1117; border: 1px solid #30363d; padding: 15px; border-radius: 6px; }
+        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; font-weight: bold; }
+        .tag-green { background: #1b4b36; color: #4ade80; }
+        .tag-red { background: #4b1b1b; color: #ff8888; }
+        
+        /* ALERT SCREEN (Když vlezeš kam nemáš) */
+        .alert-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #3d0000; color: #ffcccc; padding: 50px; box-sizing: border-box; z-index: 999;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>POLICIE ČR</h2>
+        
+        <button onclick="switchTab('dashboard')" class="menu-btn active"><span class="menu-icon">🏠</span> Přehled</button>
+        <button onclick="switchTab('dispecink')" class="menu-btn"><span class="menu-icon">📡</span> Operační (LUNA)</button>
+        
+        <div style="height: 1px; background: #30363d; margin: 10px 0;"></div>
+        <div style="font-size: 11px; color: #666; padding-left: 10px; margin-bottom: 5px;">AGENDA</div>
+
+        <button onclick="checkCriminalAccess()" class="menu-btn"><span class="menu-icon">📂</span> Vyšetřovací spisy</button>
+        <button onclick="switchTab('warrants')" class="menu-btn"><span class="menu-icon">⚖️</span> Zatykače</button>
+        <button onclick="switchTab('evidence')" class="menu-btn"><span class="menu-icon">📦</span> Sklad důkazů</button>
+        <button onclick="switchTab('cars')" class="menu-btn"><span class="menu-icon">🚓</span> Vozový park</button>
+        <button onclick="switchTab('weapons')" class="menu-btn"><span class="menu-icon">🔫</span> Zbrojní sklad</button>
+        
+        <div style="height: 1px; background: #30363d; margin: 10px 0;"></div>
+        <div style="font-size: 11px; color: #666; padding-left: 10px; margin-bottom: 5px;">ADMINISTRATIVA</div>
+
+        <button onclick="switchTab('bulletin')" class="menu-btn"><span class="menu-icon">📢</span> Informační deska</button>
+        <button onclick="switchTab('academy')" class="menu-btn"><span class="menu-icon">🎓</span> Akademie</button>
+        <button onclick="switchTab('hr')" class="menu-btn"><span class="menu-icon">🎖️</span> Personální</button>
+        <button onclick="switchTab('ovk')" class="menu-btn"><span class="menu-icon">🕵️</span> Vnitřní kontrola</button>
+        
+        <div style="margin-top: auto;">
+            <button onclick="logout()" class="menu-btn" style="color: #ff6666;"><span class="menu-icon">🚪</span> Odhlásit se</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        
+        <div id="tab-dashboard" class="section active">
+            <div class="header-bar">
+                <h1>Vítejte v systému, <span id="userName">...</span></h1>
+                <span id="userOE" style="color: #8b949e;">OEČ: ...</span>
+            </div>
+            <div class="card-grid">
+                <div class="data-card" onclick="switchTab('bulletin')" style="cursor:pointer; border-left: 4px solid #0055a4;">
+                    <h3>📢 Poslední oznámení</h3>
+                    <p style="font-size:13px; color:#aaa;">Klikněte pro zobrazení směrnic a rozkazů.</p>
+                </div>
+                <div class="data-card" onclick="switchTab('dispecink')" style="cursor:pointer; border-left: 4px solid #00ff88;">
+                    <h3>📡 Můj Status</h3>
+                    <div id="dashboardStatus">Načítám...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-kriminalka" class="section">
+            <div class="header-bar">
+                <h2>📂 Vyšetřovací spisy (SKPV)</h2>
+                <button class="menu-btn" style="width:auto; background:#238636; color:white;">+ NOVÝ SPIS</button>
+            </div>
+            <div id="criminalList" class="card-grid">
+                <p>Načítám tajné spisy...</p>
+            </div>
+        </div>
+
+        <div id="tab-warrants" class="section">
+            <div class="header-bar">
+                <h2>⚖️ Aktivní zatykače</h2>
+                <button class="menu-btn" style="width:auto; background:#a40e26; color:white;">+ VYDAT ZATYKAČ</button>
+            </div>
+            <div id="warrantsList">
+                <div class="data-card">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>Hledaný: John Doe</strong>
+                        <span class="status-tag tag-red">AKTIVNÍ</span>
+                    </div>
+                    <p>Důvod: Ozbrojená loupež. Soudce: JUDr. Novák</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-dispecink" class="section">
+            <div class="header-bar">
+                <h2>📡 Operační středisko LUNA</h2>
+            </div>
+            <iframe src="dispecink.html" style="width:100%; height:80vh; border:none;"></iframe>
+        </div>
+
+        <div id="tab-evidence" class="section"><h2>📦 Sklad důkazů</h2><p>Evidence doličných předmětů...</p></div>
+        <div id="tab-cars" class="section"><h2>🚓 Vozový park</h2><p>Správa služebních vozidel...</p></div>
+        <div id="tab-weapons" class="section"><h2>🔫 Zbrojní sklad</h2><p>Výdej a příjem zbraní...</p></div>
+        <div id="tab-bulletin" class="section"><h2>📢 Informační deska</h2><p>Směrnice a nařízení...</p></div>
+        <div id="tab-academy" class="section"><h2>🎓 Policejní Akademie</h2><p>Výcvikové protokoly...</p></div>
+        <div id="tab-hr" class="section"><h2>🎖️ Personální oddělení</h2><p>Složky příslušníků...</p></div>
+        <div id="tab-ovk" class="section"><h2>🕵️ Vnitřní kontrola</h2><p>Přístup pouze pro inspekci.</p></div>
+
+        <div id="accessDeniedOverlay" class="alert-overlay">
+            <h1 style="color:red; border-bottom:2px solid red; padding-bottom:10px;">⛔ NEOPRÁVNĚNÝ PŘÍSTUP ⛔</h1>
+            <p style="font-size:18px;"><strong>VAROVÁNÍ BEZPEČNOSTNÍHO SYSTÉMU</strong></p>
+            <p>Pokoušíte se vstoupit do databáze <strong>Služby kriminální policie a vyšetřování (SKPV)</strong> bez patřičné bezpečnostní prověrky.</p>
+            <br>
+            <p style="font-family:'Courier New';">
+                DETEKCE UŽIVATELE: <span id="intruderName"></span><br>
+                IP ADRESA: LOGGED<br>
+                STATUS: ODESÍLÁNÍ HLÁŠENÍ NA OVK...
+            </p>
+            <br>
+            <p style="color:#ff8888; font-size:14px;">
+                Tímto jednáním jste naplnil skutkovou podstatu trestného činu dle <strong>§ 230 TZ</strong> (Neoprávněný přístup k počítačovému systému). Vaše aktivita byla zaznamenána. Okamžitě opusťte tento prostor.
+            </p>
+            <button onclick="closeAlert()" style="background:#550000; color:white; padding:15px; border:1px solid red; margin-top:30px; cursor:pointer;">ROZUMÍM A ODCHÁZÍM</button>
+        </div>
+
+    </div>
+
+    <script>
+        const user = JSON.parse(localStorage.getItem('pcr_user'));
+        if (!user) window.location.href = 'index.html';
+
+        document.getElementById('userName').innerText = user.username;
+        document.getElementById('userOE').innerText = 'OEČ: ' + (user.oec || 'N/A');
+        document.getElementById('intruderName').innerText = user.username.toUpperCase();
+
+        function switchTab(tabId) {
+            // Skryje všechny sekce
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
+            
+            // Zobrazí vybranou
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            // Highlight tlačítka (najdeme podle onclicku, trochu prasárna ale funkční)
+            const btns = document.querySelectorAll('.menu-btn');
+            btns.forEach(b => {
+                if(b.getAttribute('onclick').includes(tabId)) b.classList.add('active');
+            });
+        }
+
+        // === KONTROLA PŘÍSTUPU NA KRIMINÁLKU ===
+        function checkCriminalAccess() {
+            // Role, které tam můžou (přidej sem přesné názvy z DB)
+            const allowed = ['Kriminální policie', 'Generálporučík', 'Generálmajor', 'Vedení PČR'];
+            
+            // Má uživatel nějakou z povolených rolí?
+            const hasAccess = user.roles.some(r => allowed.includes(r));
+
+            if (hasAccess) {
+                switchTab('kriminalka');
+                loadCriminalCases(); // Načte data z DB (musíme dodělat backend)
+            } else {
+                // PUSTÍ TO NA NĚJ TU HRŮZU
+                document.getElementById('accessDeniedOverlay').style.display = 'block';
+                // Přehrát zvuk sirény? Možná příště :D
+            }
+        }
+
+        function closeAlert() {
+            document.getElementById('accessDeniedOverlay').style.display = 'none';
+            switchTab('dashboard'); // Kopne ho zpátky na úvod
+        }
+
+        function logout() { localStorage.removeItem('pcr_user'); window.location.href = 'index.html'; }
+
+        // Placeholder funkce pro načítání dat
+        async function loadCriminalCases() {
+            const list = document.getElementById('criminalList');
+            // Tady by byl fetch na API
+            list.innerHTML = '<div class="data-card"><h3>Spis č. 2024/001 - Vražda v Sandy Shores</h3><p>Stav: Otevřeno | Vyšetřuje: kpt. Novák</p></div>';
+        }
+
+    </script>
+</body>
+</html>
