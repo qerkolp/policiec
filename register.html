@@ -74,7 +74,7 @@
             };
 
             try {
-                const res = await fetch('/.netlify/functions/register', { method: 'POST', body: JSON.stringify(data) });
+                const res = await fetch('/.api/register', { method: 'POST', body: JSON.stringify(data) });
                 const result = await res.json();
                 
                 if (res.ok) {
@@ -96,3 +96,4 @@
     </script>
 </body>
 </html>
+
