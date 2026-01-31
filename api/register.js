@@ -1,22 +1,38 @@
 import { Client } from 'pg';
 import bcrypt from 'bcryptjs';
-// Fetch už je ve Vercelu nativně, import není potřeba
 
-export default async function handler(request, response) {
-    if (request.method !== 'POST') {
-        return response.status(405).json({ error: 'Method not allowed' });
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // TADY BYL PROBLÉM:
-    // Backend čeká "pass", ale frontend možná posílá "password".
-    // Tahle oprava to pojistí:
-    const user = request.body.user || request.body.username;
-    const pass = request.body.pass || request.body.password; 
-    const discordId = request.body.discordId;
-    
-    // Bezpečnostní pojistka - pokud heslo nedorazí, nepadne server, ale vrátí chybu
+    // 1. ZJISTÍME, CO SAKRA PŘIŠLO (Logování)
+    console.log("PŘÍCHOZÍ DATA (BODY):", req.body);
+    console.log("TYP DAT:", typeof req.body);
+
+    // 2. OPRAVA FORMÁTU (Pokud to přišlo jako text, převedeme na JSON)
+    let body = req.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            console.error("Chyba při parsování JSON:", e);
+            return res.status(400).json({ error: 'Špatný formát dat (JSON parse error)' });
+        }
+    }
+
+    // 3. HLEDÁNÍ DAT (Zkusíme všechny možné názvy)
+    const user = body.user || body.username || body.login;
+    const pass = body.pass || body.password || body.heslo;
+    const discordId = body.discordId || body.discord;
+
+    // Pokud stále nemáme heslo, vypíšeme chybu a skončíme
     if (!pass || !user) {
-        return response.status(400).json({ error: 'Chybí uživatelské jméno nebo heslo!' });
+        console.error("CHYBÍ DATA! User:", user, "Pass:", pass);
+        return res.status(400).json({ 
+            error: 'Chybí jméno nebo heslo!', 
+            received: body // Pošleme zpátky, co server viděl
+        });
     }
 
     const TARGET_CHANNEL_ID = '1466917316322136136'; 
@@ -39,7 +55,6 @@ export default async function handler(request, response) {
         }
 
         const hash = await bcrypt.hash(pass, 10);
-        
         const userRes = await client.query(
             "INSERT INTO pcr_users (username, password_hash, discord_id, status, oec) VALUES ($1, $2, $3, 'pending', $4) RETURNING id",
             [user, hash, discordId, oec]
@@ -48,7 +63,7 @@ export default async function handler(request, response) {
 
         await client.end();
 
-        // Odeslání na Discord (pokud je token)
+        // Discord odeslání (pokud je token)
         const botToken = process.env.BOT_TOKEN;
         if (botToken) {
             const embed = {
@@ -78,10 +93,10 @@ export default async function handler(request, response) {
             });
         }
 
-        return response.status(200).json({ message: 'Žádost odeslána.' });
+        return res.status(200).json({ message: 'Žádost odeslána.' });
 
     } catch (err) {
-        console.error(err);
-        return response.status(500).json({ error: 'Chyba serveru: ' + err.message });
+        console.error("CHYBA SERVERU:", err);
+        return res.status(500).json({ error: 'Chyba serveru: ' + err.message });
     }
 }
