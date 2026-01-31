@@ -1,12 +1,12 @@
 import { Client } from 'pg';
 
-export default async function handler(request, response) {
-    if (request.method !== 'POST') {
-        return response.status(405).send('Method Not Allowed');
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const data = request.body;
-
+    const data = req.body;
+    
     const client = new Client({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
@@ -19,10 +19,8 @@ export default async function handler(request, response) {
             [data.case_number, data.suspect, data.law, data.description, data.officer]
         );
         await client.end();
-        return response.status(200).json({ message: 'OK' });
-
+        return res.status(200).json({ message: 'OK' });
     } catch (err) {
-        console.error(err);
-        return response.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 }
