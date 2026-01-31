@@ -6,8 +6,14 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { user, pass } = req.body;
+    // Zase pojistka pro různé názvy proměnných
+    const user = req.body.user || req.body.username;
+    const pass = req.body.pass || req.body.password;
     
+    if (!user || !pass) {
+        return res.status(400).json({ error: 'Vyplňte jméno a heslo' });
+    }
+
     const client = new Client({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
@@ -16,10 +22,14 @@ export default async function handler(req, res) {
     try {
         await client.connect();
 
-        const result = await client.query('SELECT * FROM pcr_users WHERE username = $1', [user]);
+        // ZMĚNA: Používáme ILIKE nebo LOWER() pro ignorování velikosti písmen
+        // Trim() odstraní mezery na začátku a konci, kdyby tam nějaké byly
+        const result = await client.query('SELECT * FROM pcr_users WHERE LOWER(username) = LOWER($1)', [user.trim()]);
 
         if (result.rows.length === 0) {
             await client.end();
+            // Pro jistotu zalogujeme do Vercelu, co jsme hledali (pomůže při ladění)
+            console.log(`Login failed: User '${user}' not found in DB.`);
             return res.status(401).json({ error: 'Uživatel nenalezen' });
         }
 
