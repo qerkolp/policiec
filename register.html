@@ -73,9 +73,12 @@
                 pass: document.getElementById('pass').value
             };
 
-            try {
-                const res = await fetch('/.api/register', { method: 'POST', body: JSON.stringify(data) });
-                const result = await res.json();
+            try {const res = await fetch('/api/register', { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' },  // <--- TENTO ŘÁDEK TAM CHYBĚL!
+    body: JSON.stringify(data) 
+});
+const result = await res.json();
                 
                 if (res.ok) {
                     // === ÚSPĚCH -> ZOBRAZIT PENDING SCREEN ===
@@ -96,4 +99,5 @@
     </script>
 </body>
 </html>
+
 
